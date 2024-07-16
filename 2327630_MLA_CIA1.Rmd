@@ -1,0 +1,146 @@
+---
+title: "MLA_CIA1"
+author: "Meghna John"
+date: '2024-07-15'
+output: html_document
+---
+
+```{r}
+library(readr)
+library(dplyr)
+library(psych)
+library(DataExplorer)
+library(MASS)
+library(glmnet)
+library(caret)
+# Load the dataset
+data<- read.csv("C://CHRIST MBA//Sem 4//MLA//CarsDetails_CIA1.csv")
+head(data)
+names(data)
+str(data)
+```
+
+```{r}
+# Check for missing values
+summary(data)
+is.na(data)
+plot_missing(data)
+sum(is.na(data$Cylinders))
+# Impute missing values in the Cylinders column with the mean
+mean_cylinders<-mean(data$Cylinders,na.rm=TRUE)
+data$Cylinders[is.na(data$Cylinders)]<-mean_cylinders
+is.na(data)
+plot_missing(data)
+```
+
+```{r}
+# Converting categorical variables to numeric
+data$Make<-as.numeric(as.factor(data$Make))
+data$Model<-as.numeric(as.factor(data$Model))
+data$Type<-as.numeric(as.factor(data$Type))
+data$Origin<-as.numeric(as.factor(data$Origin))
+data$DriveTrain<-as.numeric(as.factor(data$DriveTrain))
+```
+
+```{r}
+# Split the data into training and testing sets
+set.seed(123)
+mixed_data<-data[order(runif(428)),]
+train_data<-mixed_data[1:300,]
+test_data<-mixed_data[301:428,]
+
+# Separating features and target variable
+x_train<-model.matrix(MSRP~.,data=train_data)[,-1]
+y_train<-train_data$MSRP
+x_test<-model.matrix(MSRP~.,data=test_data)[,-1]
+y_test<-test_data$MSRP
+```
+
+```{r}
+# Training the full model
+model<-lm(MSRP~.,data=train_data)
+# Model summary
+summary(model)
+fullmodel_pred<-predict(model,newdata=test_data)
+fullmodel_pred
+# Calculate performance metrics
+fullmodel<-summary(model)$r.squared
+fullmodel_test<-cor(test_data$MSRP,fullmodel_pred)^2
+fullmodel_rmse<-RMSE(fullmodel_pred,y_test)
+fullmodel_test
+fullmodel_rmse
+fullmodel
+
+#Model Evaluation
+model_step=stepAIC(model,direction='backward')
+
+#Training the reduced model
+reduced_model<-lm(MSRP~Make+Origin+DriveTrain+Invoice+EngineSize+Cylinders+Weight+Wheelbase+Length,data=train_data)
+# Model summary
+summary(reduced_model)
+# Predict and evaluate on test data
+reducedmodel_pred<-predict(reduced_model,newdata=test_data)
+reducedmodel_pred
+# Calculate performance metrics
+reducedmodel<-summary(reduced_model)$r.squared
+reducedmodel_test<-cor(test_data$MSRP,reducedmodel_pred)^2
+reducedmodel_rmse<-RMSE(reducedmodel_pred,y_test)
+reducedmodel_test
+reducedmodel_rmse
+reducedmodel
+
+
+#Training the best model
+best_model<-lm(MSRP~Make+Origin+Invoice+EngineSize+Cylinders+Wheelbase,data=train_data)
+# Model summary
+summary(best_model)
+# Predict and evaluate on test data
+bestmodel_pred<-predict(best_model,newdata=test_data)
+bestmodel_pred
+# Calculate performance metrics
+bestmodel<-summary(best_model)$r.squared
+bestmodel_test<-cor(test_data$MSRP,bestmodel_pred)^2
+bestmodel_rmse<-RMSE(bestmodel_pred,y_test)
+bestmodel_test
+bestmodel_rmse
+bestmodel
+
+
+# Compare R-squared values
+cat("Full Model - Train R2:",fullmodel,"Test R2:",fullmodel_test,"\n")
+cat("Reduced Model - Train R2:",reducedmodel,"Test R2:",reducedmodel_test,"\n")
+cat("Best Model - Train R2:",bestmodel,"Test R2:",bestmodel_test,"\n")
+
+# Compare RMSE values
+cat("Full Model - RMSE:",fullmodel_rmse,"\n")
+cat("Reduced Model - RMSE:",reducedmodel_rmse,"\n")
+cat("Best Model - RMSE:",bestmodel_rmse,"\n")
+```
+
+```{r}
+#Building Ridge and Lasso Models
+
+# Ridge Regression
+ridge_model<-glmnet(x=x_train,y=y_train,alpha=0)
+summary(ridge_model)
+# Predictions and evaluation for ridge model
+ridge_predictions<-predict(ridge_model,newx=x_test)
+ridge_rmse<-RMSE(ridge_predictions,y_test)
+ridge_r2<-R2(ridge_predictions,y_test)
+ridge_rmse
+ridge_r2
+
+
+# Lasso Regression
+lasso_model<-glmnet(x_train,y_train,alpha=1)
+lasso_predictions<-predict(lasso_model,newx=x_test)
+lasso_rmse<-RMSE(lasso_predictions,y_test)
+lasso_r2<-R2(lasso_predictions,y_test)
+lasso_rmse
+lasso_r2
+
+
+# Comparing Ridge and Lasso model
+cat("Ridge Model - RMSE:",ridge_rmse, "\n")
+cat("Lasso Model - RMSE:",lasso_rmse, "\n")
+```
